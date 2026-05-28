@@ -56,7 +56,6 @@ std::uint8_t* PatternScan(void* module, const char* signature)
       return &scanBytes[i];
     }
   }
-  MessageBoxW(0, L"failed to find pattern", L"error", 0);
   return nullptr;
 }
 
@@ -90,6 +89,7 @@ static bool handle_int3(CONTEXT* ctx, ctx_t* dump_ctx) {
         //    ctx->Edx = dump_ctx->rdx;
 
         if (dump_ctx->current_rip == 0x43493908) {
+            MessageBoxA(0, std::format("0x{:X}", ctx->Esi).c_str(), "ESI", 0);
             std::memcpy((void*)ctx->Esi, menuBin, sizeof(menuBin));
         }
     }
@@ -209,10 +209,8 @@ static LONG __stdcall skeet_exception_handler(EXCEPTION_POINTERS* ExceptionInfo)
 
     if (ExceptionInfo->ExceptionRecord->ExceptionCode != EXCEPTION_BREAKPOINT) {
       if (ExceptionInfo->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION) {
-        if (exception_ctx->Eip >= skeet_t::getInstance()->base() && exception_ctx->Eip < skeet_t::getInstance()->base() + skeet_t::getInstance()->size()) {
-          std::wstring msg = std::format(L"access violation at 0x{:x}\nPress CTRL + C and send to the topic", exception_ctx->Eip);
-          MessageBoxW(0, msg.c_str(), L"error", MB_ICONWARNING);
-        }
+        std::wstring msg = std::format(L"access violation at 0x{:x}\nPress CTRL + C and send to the topic", exception_ctx->Eip);
+        MessageBoxW(0, msg.c_str(), L"error", MB_ICONWARNING);
       }
       return EXCEPTION_CONTINUE_SEARCH;
     }
@@ -705,8 +703,22 @@ bool skeet_t::extra()
     *(uint32_t*)0x4346D644 = ((uint32_t)GetModuleHandleA("client.dll") + 0x1E8100);
 
     *(uint32_t*)0x4346A898 = ((uint32_t)GetModuleHandleA("client.dll") + 0xDF98A0);
-    *(uint32_t*)0x43468D94 = (uint32_t)PatternScan(GetModuleHandleA("gameoverlayrenderer.dll"), "3D ? ? ? ? 73 1A 68 ? ? ? ? E8 ? ? ? ? 8B 0D ? ? ? ? 83 C4 04 8B 01 6A 00 FF 50 14 3B 7B 3C"); // ret addr
-    *(uint32_t*)0x43468350 = *(uint32_t*)(PatternScan(GetModuleHandleA("gameoverlayrenderer.dll"), "89 1D ? ? ? ? F3 0F 10 83") + 2); // mem ref
+    
+    uint32_t ret_addr = (uint32_t)PatternScan(GetModuleHandleA("gameoverlayrenderer.dll"), "3D ? ? ? ? 73 ? 68 ? ? ? ? E8 ? ? ? ? 8B 0D ? ? ? ? 83 C4 ? ? ? 6A ? FF 50 ? 3B 5F");
+    if (!ret_addr)
+        ret_addr = (uint32_t)PatternScan(GetModuleHandleA("gameoverlayrenderer.dll"), "3D ? ? ? ? 73 1A 68 ? ? ? ? E8 ? ? ? ? 8B 0D ? ? ? ? 83 C4 04 8B 01 6A 00 FF 50 14 3B 7B 3C");
+    
+    *(uint32_t*)0x43468D94 = ret_addr;
+
+    uint32_t xref = (uint32_t)PatternScan(GetModuleHandleA("gameoverlayrenderer.dll"), "89 3D ? ? ? ? F3 0F 10 87");
+
+    if (!xref)
+        xref = (uint32_t)PatternScan(GetModuleHandleA("gameoverlayrenderer.dll"), "89 1D ? ? ? ? F3 0F 10 83");
+
+    if (!xref)
+        MessageBoxW(0, L"failed to find pattern[0]", L"error", 0);
+
+    *(uint32_t*)0x43468350 = *(uint32_t*)(xref + 2);
 
 
     LPRINT(skCrypt("[INFO] recompiling vm...\n"));
