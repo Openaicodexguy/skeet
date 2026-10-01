@@ -1,0 +1,42 @@
+name: Build
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Release x86
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build solution (Release / Win32)
+        run: msbuild skeet.sln /m /nologo /verbosity:minimal /p:Configuration=Release /p:Platform=Win32
+
+      - name: Collect artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          $files = Get-ChildItem -Path . -Recurse -File -Include skeet.dll,steam.exe -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -notmatch '\\obj\\' -and $_.FullName -notmatch '\\artifacts\\' }
+          if (-not $files) { throw "Build outputs not found (skeet.dll / steam.exe)" }
+          $files | ForEach-Object {
+            Write-Host "Found $($_.FullName)"
+            Copy-Item -LiteralPath $_.FullName -Destination artifacts -Force
+          }
+          Get-ChildItem artifacts
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: skeet-release-x86
+          path: artifacts/*
+          if-no-files-found: error
