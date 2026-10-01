@@ -18,8 +18,8 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
-      - name: Build solution (Release / Win32)
-        run: msbuild skeet.sln /m /nologo /verbosity:minimal /p:Configuration=Release /p:Platform=Win32
+      - name: Build solution (Release / x86)
+        run: msbuild skeet.sln /m /nologo /verbosity:minimal /p:Configuration=Release /p:Platform=x86
 
       - name: Collect artifacts
         shell: pwsh
